@@ -1,0 +1,13 @@
+[Unit]
+Description=Service to check what's playing in Neeraj's ear
+After=network.target
+
+[Service]
+Type=simple
+User=nobody
+Restart=on-failure
+RestartSec=5s
+ExecStart=/var/www/whats-playing/frps -bind ":8086"
+
+[Install]
+WantedBy=multi-user.target
