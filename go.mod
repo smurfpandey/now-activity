@@ -1,4 +1,4 @@
-module github.com/smurfpandey/whats-playing
+module github.com/smurfpandey/now-activity
 
 go 1.12
 

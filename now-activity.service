@@ -1,5 +1,5 @@
 [Unit]
-Description=Service to check what's playing in Neeraj's ear
+Description=Service to check what's he doing
 After=network.target
 
 [Service]
@@ -7,7 +7,7 @@ Type=simple
 User=nobody
 Restart=on-failure
 RestartSec=5s
-ExecStart=/var/www/now-music/whats-playing -bind ":8086"
+ExecStart=/var/www/now-activity/now-activity -bind ":8086"
 
 [Install]
 WantedBy=multi-user.target

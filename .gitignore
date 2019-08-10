@@ -4,8 +4,8 @@
 *.dll
 *.so
 *.dylib
-whats-playing
-whats-playing.tar.gz
+now-activity
+now-activity.tar.gz
 
 # Test binary, build with `go test -c`
 *.test
