@@ -21,6 +21,7 @@ func main() {
 
 	// Add routes to the global handler
 	goji.Get("/whats-playing", whatsPlaying)
+	goji.Get("/healthcheck", healthCheck)
 
 	// Use a custom 404 handler
 	goji.NotFound(NotFound)
@@ -58,4 +59,10 @@ func whatsPlaying(w http.ResponseWriter, r *http.Request) {
 // NotFound is a 404 handler.
 func NotFound(w http.ResponseWriter, r *http.Request) {
 	http.Error(w, "Umm... have you tried turning it off and on again?", 404)
+}
+
+// Healthcheck handler
+func healthCheck(w http.ResponseWriter, r *http.Request) {
+	io.WriteString(w, "Ok")
+	return
 }
