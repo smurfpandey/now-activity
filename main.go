@@ -11,13 +11,16 @@ import (
 	"github.com/zenazn/goji"
 )
 
+var cacheDuration time.Duration
 var myCache *cache.Cache
+
 
 func main() {
 
-	// Create a cache with a default expiration time of 5 minutes, and which
-	// purges expired items every 10 minutes
-	myCache = cache.New(3*time.Minute, 6*time.Minute)
+	// Create a cache with a default expiration time of 3 minutes, and which
+	// purges expired items every 5 minutes
+	cacheDuration = 3*time.Minute
+	myCache = cache.New(cacheDuration, 5*time.Minute)
 
 	// Add routes to the global handler
 	goji.Get("/whats-playing", whatsPlaying)
@@ -35,15 +38,18 @@ func main() {
 }
 
 // whatsPlaying route (GET "/"). Print a list of greets.
-func whatsPlaying(w http.ResponseWriter, r *http.Request) {
+func whatsPlaying(httpResp http.ResponseWriter, httpReq *http.Request) {
 
-	foo, found := myCache.Get("wow-music")
+	httpResp.Header().Set("Content-Type", "application/json")
+
+	musicData, expiryTime, found := myCache.GetWithExpiration("wow-music")
 	if found {
-		io.WriteString(w, foo.(string))
+		httpResp.Header().Set("Expires", getHTTPTime(expiryTime))
+		io.WriteString(httpResp, musicData.(string))
 		return
 	}
 
-	rawResp, _ := req.Get("https://api.listenbrainz.org//1/user/smurfpandey/playing-now")
+	rawResp, _ := req.Get("https://api.listenbrainz.org/1/user/smurfpandey/playing-now")
 	resp := rawResp.Response()
 		
 	bodyBytes, _ := ioutil.ReadAll(resp.Body)
@@ -53,7 +59,9 @@ func whatsPlaying(w http.ResponseWriter, r *http.Request) {
 	// save in cache
 	myCache.Set("wow-music", bodyString, cache.DefaultExpiration)
 	
-	io.WriteString(w, bodyString)
+	expiryTime = time.Now().Add(cacheDuration)
+	httpResp.Header().Set("Expires", getHTTPTime(expiryTime))
+	io.WriteString(httpResp, bodyString)
 }
 
 // NotFound is a 404 handler.
@@ -65,4 +73,8 @@ func NotFound(w http.ResponseWriter, r *http.Request) {
 func healthCheck(w http.ResponseWriter, r *http.Request) {
 	io.WriteString(w, "Ok")
 	return
+}
+
+func getHTTPTime(yourTime time.Time) string {
+	return yourTime.UTC().Format(http.TimeFormat)
 }
