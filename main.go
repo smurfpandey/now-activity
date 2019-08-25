@@ -3,6 +3,7 @@ package main
 import (
 	"io"
 	"io/ioutil"
+	"encoding/json"
 	"net/http"
 	"time"
 
@@ -11,8 +12,20 @@ import (
 	"github.com/zenazn/goji"
 )
 
+type Game struct {
+	Name      string `json:"name"`
+	Exec      string `json:"exec_name"`
+	Website   string `json:"website_url"`
+	Store     string `json:"store_url"`
+	StartedAt int    `json:"started_at"` 
+}
+
 var cacheDuration time.Duration
 var myCache *cache.Cache
+const (
+	CACHE_KEY_MUSIC = "wow-music"
+	CACHE_KEY_GAME = "wow-game"
+)
 
 
 func main() {
@@ -23,8 +36,12 @@ func main() {
 	myCache = cache.New(cacheDuration, 5*time.Minute)
 
 	// Add routes to the global handler
-	goji.Get("/whats-playing", whatsPlaying)
+	goji.Get("/listening", whatMusic)
 	goji.Get("/healthcheck", healthCheck)
+
+	goji.Get("/playing", whatGame)
+	goji.Post("/playing", startedGame)
+	goji.Delete("/playing", closedGame)
 
 	// Use a custom 404 handler
 	goji.NotFound(NotFound)
@@ -37,12 +54,12 @@ func main() {
 	goji.Serve()
 }
 
-// whatsPlaying route (GET "/"). Print a list of greets.
-func whatsPlaying(httpResp http.ResponseWriter, httpReq *http.Request) {
+// whatMusic route (GET "/"). Print a list of greets.
+func whatMusic(httpResp http.ResponseWriter, httpReq *http.Request) {
 
 	httpResp.Header().Set("Content-Type", "application/json")
 
-	musicData, expiryTime, found := myCache.GetWithExpiration("wow-music")
+	musicData, expiryTime, found := myCache.GetWithExpiration(CACHE_KEY_MUSIC)
 	if found {
 		httpResp.Header().Set("Expires", getHTTPTime(expiryTime))
 		io.WriteString(httpResp, musicData.(string))
@@ -57,7 +74,7 @@ func whatsPlaying(httpResp http.ResponseWriter, httpReq *http.Request) {
 	bodyString := string(bodyBytes)
 	
 	// save in cache
-	myCache.Set("wow-music", bodyString, cache.DefaultExpiration)
+	myCache.Set(CACHE_KEY_MUSIC, bodyString, cache.DefaultExpiration)
 	
 	expiryTime = time.Now().Add(cacheDuration)
 	httpResp.Header().Set("Expires", getHTTPTime(expiryTime))
@@ -77,4 +94,41 @@ func healthCheck(w http.ResponseWriter, r *http.Request) {
 
 func getHTTPTime(yourTime time.Time) string {
 	return yourTime.UTC().Format(http.TimeFormat)
+}
+
+func startedGame(httpResp http.ResponseWriter, httpReq *http.Request) {
+	decoder := json.NewDecoder(httpReq.Body)
+    var gameBeingPlayed Game
+    err := decoder.Decode(&gameBeingPlayed)
+    if err != nil {
+        http.Error(httpResp, "Umm... are you sure this is the correct data?", 400)
+	}
+	
+	myCache.Set(CACHE_KEY_GAME, &gameBeingPlayed, 5*time.Hour)
+	
+	io.WriteString(httpResp, "Ok")
+}
+
+func whatGame(httpResp http.ResponseWriter, httpReq *http.Request) {
+	cacheData, found := myCache.Get(CACHE_KEY_GAME)
+	if found {
+		gameBeingPlayed := cacheData.(*Game)
+		strGame, err := json.Marshal(gameBeingPlayed)
+		if err != nil {
+			http.Error(httpResp, "Ohh... game data is corrupted?", 500)
+			return
+		}
+
+		httpResp.Header().Set("Content-Type", "application/json")
+
+		io.WriteString(httpResp, string(strGame))
+		return
+	}
+
+	io.WriteString(httpResp, "Nothing")
+}
+
+func closedGame(httpResp http.ResponseWriter, httpReq *http.Request) {
+	myCache.Delete(CACHE_KEY_GAME)
+	io.WriteString(httpResp, "Ok")
 }
