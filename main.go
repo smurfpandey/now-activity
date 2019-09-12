@@ -1,14 +1,14 @@
 package main
 
 import (
+	"encoding/json"
 	"io"
 	"io/ioutil"
-	"encoding/json"
 	"net/http"
 	"time"
 
-	"github.com/patrickmn/go-cache"
 	"github.com/imroc/req"
+	"github.com/patrickmn/go-cache"
 	"github.com/zenazn/goji"
 )
 
@@ -17,22 +17,22 @@ type Game struct {
 	Exec      string `json:"exec_name"`
 	Website   string `json:"website_url"`
 	Store     string `json:"store_url"`
-	StartedAt int    `json:"started_at"` 
+	StartedAt int    `json:"started_at"`
 }
 
 var cacheDuration time.Duration
 var myCache *cache.Cache
+
 const (
 	CACHE_KEY_MUSIC = "wow-music"
-	CACHE_KEY_GAME = "wow-game"
+	CACHE_KEY_GAME  = "wow-game"
 )
-
 
 func main() {
 
 	// Create a cache with a default expiration time of 3 minutes, and which
 	// purges expired items every 5 minutes
-	cacheDuration = 3*time.Minute
+	cacheDuration = 3 * time.Minute
 	myCache = cache.New(cacheDuration, 5*time.Minute)
 
 	// Add routes to the global handler
@@ -68,14 +68,14 @@ func whatMusic(httpResp http.ResponseWriter, httpReq *http.Request) {
 
 	rawResp, _ := req.Get("https://api.listenbrainz.org/1/user/smurfpandey/playing-now")
 	resp := rawResp.Response()
-		
+
 	bodyBytes, _ := ioutil.ReadAll(resp.Body)
-    
+
 	bodyString := string(bodyBytes)
-	
+
 	// save in cache
 	myCache.Set(CACHE_KEY_MUSIC, bodyString, cache.DefaultExpiration)
-	
+
 	expiryTime = time.Now().Add(cacheDuration)
 	httpResp.Header().Set("Expires", getHTTPTime(expiryTime))
 	io.WriteString(httpResp, bodyString)
@@ -98,14 +98,14 @@ func getHTTPTime(yourTime time.Time) string {
 
 func startedGame(httpResp http.ResponseWriter, httpReq *http.Request) {
 	decoder := json.NewDecoder(httpReq.Body)
-    var gameBeingPlayed Game
-    err := decoder.Decode(&gameBeingPlayed)
-    if err != nil {
-        http.Error(httpResp, "Umm... are you sure this is the correct data?", 400)
+	var gameBeingPlayed Game
+	err := decoder.Decode(&gameBeingPlayed)
+	if err != nil {
+		http.Error(httpResp, "Umm... are you sure this is the correct data?", 400)
 	}
-	
+
 	myCache.Set(CACHE_KEY_GAME, &gameBeingPlayed, 5*time.Hour)
-	
+
 	io.WriteString(httpResp, "Ok")
 }
 
